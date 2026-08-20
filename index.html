@@ -156,6 +156,7 @@ body { font-family: 'Cairo', sans-serif; }
             <button onclick="openPdfModal('faults')" class="w-full text-right px-4 py-3.5 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 text-xs font-bold transition-colors">🛠️ أعطال وحدات متحركة</button>
             <button onclick="openPdfModal('sop')" class="w-full text-right px-4 py-3.5 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 text-xs font-bold transition-colors">📖 إجراءات التشغيل (SOP)</button>
             <button onclick="openInstructionsMenuModal()" class="w-full text-right px-4 py-3.5 hover:bg-purple-50/50 dark:hover:bg-gray-700/50 font-black text-purple-600 text-xs transition-colors">📚 التعليمات وسجل الإشعارات</button>
+            <button onclick="openDriverReportsModal()" class="w-full text-right px-4 py-3.5 hover:bg-teal-50/50 dark:hover:bg-gray-700/50 font-black text-teal-600 text-xs transition-colors">📝 نوتة الأعطال والملاحظات</button>
             <button onclick="toggleTheme()" id="themeToggleBtn" class="w-full text-right px-4 py-3.5 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 text-xs font-bold transition-colors">الوضع النهاري ☀️</button>
             <button onclick="openTechSupportModal()" class="w-full text-right px-4 py-3.5 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 font-black text-amber-600 text-xs transition-colors">🛠️ الدعم الفني</button>
             <button onclick="logout()" class="w-full text-right px-4 py-3.5 hover:bg-red-50/80 dark:hover:bg-red-900/20 text-red-600 font-black text-xs transition-colors">تسجيل الخروج 🚪</button>
@@ -663,12 +664,37 @@ body { font-family: 'Cairo', sans-serif; }
     </div>
 </div>
 
-    <div id="admin-page" class="hidden-section min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
+<div id="driverReportsModal" class="hidden-section fixed inset-0 bg-black/60 backdrop-blur-md z-[99999] flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 w-full max-w-2xl max-h-[90vh] rounded-3xl premium-shadow p-6 border border-gray-200 dark:border-gray-700 relative text-right transition-all flex flex-col">
+        <div class="flex justify-between items-center border-b dark:border-gray-700 pb-4 mb-4">
+            <h3 class="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-cyan-600 flex items-center gap-2"><span>📝</span> نوتة الأعطال والملاحظات</h3>
+            <button onclick="closeDriverReportsModal()" class="text-gray-400 hover:text-red-500 font-bold text-2xl bg-gray-100 dark:bg-gray-700 w-8 h-8 rounded-full flex items-center justify-center leading-none">&times;</button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div class="bg-teal-50 dark:bg-teal-900/20 p-3 rounded-2xl border border-teal-100 dark:border-teal-800/30">
+                <label class="block text-xs font-black text-teal-800 dark:text-teal-300 mb-1.5">📆 تقرير يوم محدد:</label>
+                <input type="date" id="reportDailyDate" class="w-full px-3 py-2 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl font-black text-teal-600 text-sm shadow-sm">
+            </div>
+            <div class="bg-cyan-50 dark:bg-cyan-900/20 p-3 rounded-2xl border border-cyan-100 dark:border-cyan-800/30">
+                <label class="block text-xs font-black text-cyan-800 dark:text-cyan-300 mb-1.5">🗓️ تقرير شهر كامل:</label>
+                <input type="month" id="reportMonthDate" class="w-full px-3 py-2 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-xl font-black text-cyan-600 text-sm shadow-sm">
+            </div>
+        </div>
+        <div class="flex gap-2 mb-4">
+            <button onclick="extractDriverReport('daily')" class="flex-1 bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-600 hover:to-emerald-700 text-white font-black py-2.5 rounded-xl text-xs shadow-md transition-transform hover:-translate-y-0.5">🔍 استخراج اليوم</button>
+            <button onclick="extractDriverReport('month')" class="flex-1 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-black py-2.5 rounded-xl text-xs shadow-md transition-transform hover:-translate-y-0.5">📊 استخراج الشهر</button>
+            <button onclick="generateDriverReportPDF()" class="bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white font-black px-4 py-2.5 rounded-xl text-xs shadow-md transition-transform hover:-translate-y-0.5 flex items-center gap-1"><span>📄</span> طباعة PDF</button>
+        </div>
+        <div id="driverReportResultBox" class="flex-1 overflow-y-auto hide-scrollbar border dark:border-gray-700 rounded-2xl p-4 bg-slate-50 dark:bg-gray-900/50 space-y-3">
+            <div class="text-center text-gray-400 py-12 text-xs font-bold border-2 border-dashed rounded-xl dark:border-gray-700">اختر التاريخ واضغط استخراج لعرض الملاحظات والأعطال...</div>
+        </div>
+    </div>
+</div>
+<div id="admin-page" class="hidden-section min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900">
     <nav class="bg-gradient-to-r from-purple-800 to-indigo-900 text-white p-4 shadow-lg flex justify-between items-center relative overflow-hidden">
         <div class="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20"></div>
         <h1 class="text-xl font-black relative z-10 flex items-center gap-2"><span>👑</span> لوحة الإدارة الشاملة</h1>
         <div class="flex items-center gap-2 relative z-10">
-            <!-- 🟢 زرار باسوورد الأدمن الصغير والشيك جداً -->
             <button onclick="openAdminPasswordModal()" class="bg-purple-600/80 hover:bg-purple-500 px-3 py-1.5 rounded-xl font-black text-xs shadow-sm backdrop-blur-sm transition-colors flex items-center gap-1"><span>⚙️</span> باسورد الأدمن</button>
             <button onclick="logout()" class="bg-red-500/80 hover:bg-red-500 px-4 py-1.5 rounded-xl font-black text-xs shadow-sm backdrop-blur-sm transition-colors">خروج</button>
         </div>
@@ -998,6 +1024,11 @@ function saveUnitNumber(tNum, dateVal) {
     const unitVal = unitInput.value.trim();
     if(!unitVal) { showToast("يرجى كتابة رقم الوحدة أولاً!", "error"); return; }
     localStorage.setItem('unit_' + dateVal + '_' + tNum, unitVal);
+    
+    if (currentDriver) {
+        db.ref(`driver_notes/${dateVal}/${currentDriver.radioId}/${tNum}/unit`).set(unitVal);
+    }
+    
     showToast(`تم حفظ الوحدة (${unitVal}) بنجاح!`, "success");
 }
 
@@ -1023,12 +1054,14 @@ function saveTripNote() {
     let tNum = document.getElementById('noteTripNumber').textContent;
     let dateVal = document.getElementById('noteDateVal').value;
     let noteVal = document.getElementById('tripNoteInput').value.trim();
+    let savedUnit = localStorage.getItem('unit_' + dateVal + '_' + tNum) || '';
     
     localStorage.setItem('tripNote_' + dateVal + '_' + tNum, noteVal);
     
     if (currentDriver && noteVal !== "") {
         db.ref(`driver_notes/${dateVal}/${currentDriver.radioId}/${tNum}`).set({
             note: noteVal,
+            unit: savedUnit,
             timestamp: new Date().toLocaleString('ar-EG'),
             driverName: currentDriver.name
         });
@@ -2480,14 +2513,10 @@ function processRawTextInput() {
     if (!rawText.trim()) { alert("يرجى لصق البيانات من الإكسيل أولاً!"); return; }
 
     rawText = rawText.replace(/[\u0000-\u0008\u000B-\u000C\u000E-\u001F]/g, '-');
-    
-    // إعدام الأقواس تماماً زي ما طلبت عشان متخفيش الوردية جواها
     rawText = rawText.replace(/[()]/g, ' ');
 
     rawText = rawText.replace(/(\+?PTW)-[a-fA-F0-9]{8}/gi, '$1');
     rawText = rawText.replace(/\+(?!PTW)[a-zA-Z0-9_]+/gi, ''); 
-    
-    // قلب الـ RES01-M لـ M-RES01
     rawText = rawText.replace(/(RES\d{1,2})-([MEN])/gi, '$2-$1');
 
     rawText = rawText.replace(/([a-z\u0600-\u06FF])(TRG[-_]?[a-zA-Z-_]+)/g, '$1 $2'); 
@@ -2550,49 +2579,26 @@ function processRawTextInput() {
 
     function cleanShiftToken(t) {
         let upper = t.toUpperCase();
-        
         let matchRES = upper.match(/(?:^|[^A-Z])([MEN][-_]?RES\d*)/);
         if (matchRES) return matchRES[1];
-
         let matchShiftPTW = upper.match(/(?:^|[^A-Z])([MEN][-_]?\d{1,3}\+PTW)/);
-        if (matchShiftPTW) {
-            if (isDailyMode) return null;
-            return matchShiftPTW[1];
-        }
-
+        if (matchShiftPTW) { if (isDailyMode) return null; return matchShiftPTW[1]; }
         let matchDigits = upper.match(/(?:^|[^A-Z])([MEN][-_]?\d{1,3})/);
         if (matchDigits) return matchDigits[1];
-
         let matchDT = upper.match(/(?:^|[^A-Z])([MEN][-_]?DT[A-Z]+)/);
         if (matchDT) return matchDT[1];
-
         let matchEXT = upper.match(/(?:^|[^A-Z])([MEN][-_]?EXT)/);
         if (matchEXT) return matchEXT[1];
-        
         let matchPTW = upper.match(/([MEN][-_]?PTW[-_A-Z0-9]*)/);
-        if (matchPTW) {
-            if (isDailyMode) return null;
-            return matchPTW[1];
-        }
-
+        if (matchPTW) { if (isDailyMode) return null; return matchPTW[1]; }
         let matchTRG = upper.match(/(TRG[-_]?[A-Z-_]+)/);
         if (matchTRG) return matchTRG[1];
-
-        if (upper === 'PTW') {
-            if (isDailyMode) return null;
-            return 'PTW';
-        }
-
+        if (upper === 'PTW') { if (isDailyMode) return null; return 'PTW'; }
         let pureEnglish = upper.replace(/[^A-Z0-9-/]/g, '');
         const exact = ['R','REST','OFF','ABSENT','AB','CL','AL','SL','PH','TRG','SV','N/A','OOO','AL-SV', 'OT', 'COML', 'PATL'];
         if (exact.includes(pureEnglish)) return pureEnglish;
-
         if (upper.includes('تدوير')) return 'تدويرات';
-        if (upper.includes('ورش')) {
-            if (isDailyMode) return null; 
-            return 'ورشة';
-        }
-
+        if (upper.includes('ورش')) { if (isDailyMode) return null; return 'ورشة'; }
         return null; 
     }
 
@@ -2600,49 +2606,28 @@ function processRawTextInput() {
         if (currentId && !processedIDs.has(currentId)) {
             processedIDs.add(currentId);
             if (isDailyMode) {
-                if (daysMap[1]) {
-                    extractedBatchRoster.push({ rdmcId: currentId, shift: daysMap[1], mode: 'daily', dayNum: targetDayNum });
-                }
+                if (daysMap[1]) { extractedBatchRoster.push({ rdmcId: currentId, shift: daysMap[1], mode: 'daily', dayNum: targetDayNum }); }
             } else {
-                if (Object.keys(daysMap).length > 0) {
-                    extractedBatchRoster.push({ rdmcId: currentId, shiftsMap: daysMap, mode: 'full' });
-                }
+                if (Object.keys(daysMap).length > 0) { extractedBatchRoster.push({ rdmcId: currentId, shiftsMap: daysMap, mode: 'full' }); }
             }
         }
     }
 
     for (let i = 0; i < tokens.length; i++) {
         let rawToken = tokens[i];
-        
         if (rdmcPattern.test(rawToken)) {
             if (currentId) saveCurrentDriver(); 
-            
             let parsedId = rawToken.toUpperCase().replace('ROMC', 'RDMC').replace('-', '');
-            
-            if (processedIDs.has(parsedId)) {
-                currentId = null;
-            } else {
-                currentId = parsedId;
-                daysMap = {}; 
-                dayCount = 1; 
-            }
+            if (processedIDs.has(parsedId)) { currentId = null; } 
+            else { currentId = parsedId; daysMap = {}; dayCount = 1; }
             continue; 
         }
-        
         if (currentId) {
             let cleanedToken = cleanShiftToken(rawToken); 
             if (cleanedToken) {
                 let finalToken = cleanedToken.replace(/_/g, ' '); 
-                if (isDailyMode) {
-                    if (!daysMap[1]) {
-                        daysMap[1] = finalToken; 
-                    }
-                } else {
-                    if (dayCount <= 31) {
-                        daysMap[dayCount] = finalToken;
-                        dayCount++;
-                    }
-                }
+                if (isDailyMode) { if (!daysMap[1]) { daysMap[1] = finalToken; } } 
+                else { if (dayCount <= 31) { daysMap[dayCount] = finalToken; dayCount++; } }
             }
         }
     }
@@ -2911,6 +2896,185 @@ function applyManualAssignments() {
         showToast(`تم تسكين ${addedCount} وردية يدوياً بنجاح!`, 'success');
     }
     closeManualAssignModal();
+}
+
+function openDriverReportsModal() {
+    if (document.getElementById('settingsMenu')) {
+        document.getElementById('settingsMenu').classList.add('hidden');
+    }
+    document.getElementById('driverReportsModal').classList.remove('hidden-section');
+    
+    document.getElementById('reportDailyDate').value = getTodayYYYYMMDD();
+    let todayD = new Date();
+    document.getElementById('reportMonthDate').value = `${todayD.getFullYear()}-${String(todayD.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function closeDriverReportsModal() {
+    document.getElementById('driverReportsModal').classList.add('hidden-section');
+}
+
+function extractDriverReport(type = 'daily') {
+    if (!currentDriver) {
+        showToast("يرجى تسجيل الدخول أولاً!", "error");
+        return;
+    }
+
+    const resultBox = document.getElementById('driverReportResultBox');
+    resultBox.innerHTML = '<div class="text-center py-8 text-teal-500 font-bold text-sm">⏳ جاري سحب نوتة الملاحظات والأعطال من الفايربيز...</div>';
+
+    if (type === 'daily') {
+        const dateVal = document.getElementById('reportDailyDate').value;
+        if (!dateVal) { showToast("يرجى تحديد تاريخ اليوم أولاً!", "error"); return; }
+
+        db.ref(`driver_notes/${dateVal}/${currentDriver.radioId}`).once('value').then(snapshot => {
+            const notesData = snapshot.val();
+
+            if (!notesData) {
+                resultBox.innerHTML = `<div class="text-center text-gray-400 py-10 text-xs font-bold border-2 border-dashed rounded-xl dark:border-gray-700">لا توجد ملاحظات أو أعطال مسجلة لك بتاريخ: ${dateVal}</div>`;
+                return;
+            }
+
+            let rowsHTML = '';
+            for (let tNum in notesData) {
+                let item = notesData[tNum];
+                let unit = item.unit || localStorage.getItem('unit_' + dateVal + '_' + tNum) || 'غير محدد';
+                let note = item.note || '';
+                let time = item.timestamp || '--:--';
+
+                rowsHTML += `
+                    <tr class="border-b dark:border-gray-700 text-xs hover:bg-slate-100 dark:hover:bg-gray-800">
+                        <td class="p-3 font-mono font-black text-blue-600">${tNum}</td>
+                        <td class="p-3 font-mono font-bold text-purple-600">${unit}</td>
+                        <td class="p-3 font-bold text-gray-800 dark:text-gray-200 whitespace-pre-wrap">${note}</td>
+                        <td class="p-3 text-[11px] text-gray-400 font-mono">${time}</td>
+                    </tr>
+                `;
+            }
+
+            resultBox.innerHTML = `
+                <div class="border-b dark:border-gray-700 pb-3 mb-3 text-right">
+                    <h4 class="font-black text-sm text-teal-600 dark:text-teal-400">📝 نوتة الأعطال والملاحظات ليوم: ${dateVal}</h4>
+                    <p class="text-[11px] text-gray-500 font-bold mt-1">القائد: ${currentDriver.name} | رقم الراديو: ${currentDriver.radioId}</p>
+                </div>
+                <table class="w-full text-right border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 dark:bg-gray-800 text-[11px] font-black text-gray-600 dark:text-gray-300">
+                            <th class="p-2.5">رقم الرحلة</th>
+                            <th class="p-2.5">رقم الوحدة</th>
+                            <th class="p-2.5">الملاحظة / العطل المسجل</th>
+                            <th class="p-2.5">وقت التسجيل</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y dark:divide-gray-700">${rowsHTML}</tbody>
+                </table>
+            `;
+            showToast("تم جلب نوتة اليوم بنجاح", "success");
+        }).catch(err => {
+            resultBox.innerHTML = `<div class="text-center text-red-500 py-6 font-bold text-xs">حدث خطأ أثناء جلب البيانات: ${err.message}</div>`;
+        });
+
+    } else if (type === 'month') {
+        const monthVal = document.getElementById('reportMonthDate').value;
+        if (!monthVal) { showToast("يرجى تحديد الشهر أولاً!", "error"); return; }
+
+        db.ref('driver_notes').once('value').then(snapshot => {
+            const allNotes = snapshot.val();
+            let rowsHTML = '';
+            let count = 0;
+
+            if (allNotes) {
+                for (let dateKey in allNotes) {
+                    if (dateKey.startsWith(monthVal)) {
+                        let dayDriverNotes = allNotes[dateKey][currentDriver.radioId];
+                        if (dayDriverNotes) {
+                            for (let tNum in dayDriverNotes) {
+                                count++;
+                                let item = dayDriverNotes[tNum];
+                                let unit = item.unit || localStorage.getItem('unit_' + dateKey + '_' + tNum) || 'غير محدد';
+                                let note = item.note || '';
+                                let time = item.timestamp || '--:--';
+
+                                rowsHTML += `
+                                    <tr class="border-b dark:border-gray-700 text-xs hover:bg-slate-100 dark:hover:bg-gray-800">
+                                        <td class="p-2.5 font-bold text-teal-600">${dateKey}</td>
+                                        <td class="p-2.5 font-mono font-black text-blue-600">${tNum}</td>
+                                        <td class="p-2.5 font-mono font-bold text-purple-600">${unit}</td>
+                                        <td class="p-2.5 font-bold text-gray-800 dark:text-gray-200 whitespace-pre-wrap">${note}</td>
+                                        <td class="p-2.5 text-[11px] text-gray-400 font-mono">${time}</td>
+                                    </tr>
+                                `;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (count === 0) {
+                resultBox.innerHTML = `<div class="text-center text-gray-400 py-10 text-xs font-bold border-2 border-dashed rounded-xl dark:border-gray-700">لا توجد ملاحظات أو أعطال مسجلة لك خلال شهر: ${monthVal}</div>`;
+                return;
+            }
+
+            resultBox.innerHTML = `
+                <div class="border-b dark:border-gray-700 pb-3 mb-3 text-right">
+                    <h4 class="font-black text-sm text-cyan-600 dark:text-cyan-400">📊 سجل أعطال وملاحظات شهر: ${monthVal}</h4>
+                    <p class="text-[11px] text-gray-500 font-bold">القائد: ${currentDriver.name} | إجمالي الملاحظات: ${count}</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-right border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 dark:bg-gray-800 text-[11px] font-black text-gray-600 dark:text-gray-300">
+                                <th class="p-2.5">التاريخ</th>
+                                <th class="p-2.5">الرحلة</th>
+                                <th class="p-2.5">الوحدة</th>
+                                <th class="p-2.5">الملاحظة / العطل المسجل</th>
+                                <th class="p-2.5">الوقت</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y dark:divide-gray-700">${rowsHTML}</tbody>
+                    </table>
+                </div>
+            `;
+            showToast(`تم استخراج ${count} ملاحظة للشهر`, "success");
+        }).catch(err => {
+            resultBox.innerHTML = `<div class="text-center text-red-500 py-6 font-bold text-xs">حدث خطأ: ${err.message}</div>`;
+        });
+    }
+}
+
+function generateDriverReportPDF() {
+    const content = document.getElementById('driverReportResultBox').innerHTML;
+    if (!content || content.includes('اختر التاريخ واضغط استخراج') || content.includes('لا توجد ملاحظات')) {
+        showToast("يرجى استخراج نوتة الملاحظات أولاً قبل الطباعة!", "error");
+        return;
+    }
+
+    const printWindow = window.open('', '', 'height=700,width=900');
+    printWindow.document.write(`
+        <html dir="rtl" lang="ar">
+        <head>
+            <title>سجل ملاحظات وأعطال قائد القطار</title>
+            <style>
+                body { font-family: 'Cairo', Tahoma, sans-serif; padding: 20px; direction: rtl; color: #111; }
+                table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+                th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: right; font-size: 12px; }
+                th { background-color: #f1f5f9; font-weight: bold; }
+                .text-center { text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #334155; padding-bottom: 10px;">
+                <h2>سجل ملاحظات وأعطال قائد القطار - الخط الثالث</h2>
+            </div>
+            ${content}
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 500);
 }
 </script>
 </body>
