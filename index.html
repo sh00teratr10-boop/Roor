@@ -1482,20 +1482,34 @@ async function loadAllData() {
     document.addEventListener('DOMContentLoaded', function() {
     applyLanguageToDOM(); 
     
-    // 🔥 شريط التحميل بيكمل هنا وبيدخلك على السيستم بعد 2.1 ثانية 🔥
+        // 🔥 التعديل السحري: شاشة التحميل مش هتفتح غير لما الداتا كلها توصل 🔥
     setTimeout(() => {
         const splashBar = document.getElementById('splash-bar');
-        if (splashBar) splashBar.style.width = '100%'; 
+        if (splashBar) { splashBar.style.width = '60%'; splashBar.style.transitionDuration = '6000ms'; }
     }, 100);
 
-    setTimeout(() => {
-        const splash = document.getElementById('splash-screen');
-        splash.style.opacity = '0';
-        setTimeout(() => {
-            splash.classList.add('hidden-section');
-            if(!currentDriver && document.getElementById('admin-page').classList.contains('hidden-section')) { document.getElementById('auth-page').classList.remove('hidden-section'); }
-        }, 700);
-    }, 2100);
+    let checkDataInterval = setInterval(() => {
+        // الكود هنا بيفضل يلف كل نص ثانية يتأكد إن كشف السواقين والجداول حملت
+        if (driversData.length > 0 && Object.keys(cairoDataMap).length > 0) {
+            clearInterval(checkDataInterval); // وقف اللف
+            const splashBar = document.getElementById('splash-bar');
+            if (splashBar) { splashBar.style.transitionDuration = '300ms'; splashBar.style.width = '100%'; } // كمل الشريط للآخر
+            
+            setTimeout(() => {
+                const splash = document.getElementById('splash-screen');
+                if (splash) splash.style.opacity = '0';
+                setTimeout(() => {
+                    if (splash) splash.classList.add('hidden-section');
+                    if(!currentDriver && document.getElementById('admin-page').classList.contains('hidden-section')) { 
+                        document.getElementById('auth-page').classList.remove('hidden-section'); 
+                    } else if (currentDriver) {
+                        renderDailyDetails(); // حدث الشاشة لو مسجل دخول
+                    }
+                }, 700);
+            }, 300);
+        }
+    }, 500);
+
 
     var savedRadioId = localStorage.getItem('savedRadioId');
     var savedPassword = localStorage.getItem('savedPassword');
