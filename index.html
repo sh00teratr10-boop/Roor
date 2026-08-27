@@ -3161,18 +3161,53 @@ function saveAllRosterToFirebase() {
     }
 
     let updates = {};
-    extractedBatchRoster.forEach(item => {
-        let normId = item.rdmcId;
-        if (item.mode === 'daily') { 
-            let dailyDateVal = document.getElementById('adminDailyDateInput').value;
-            let dailyMonthNum = parseInt(dailyDateVal.split('-')[1], 10);
-            let rosterNode = 'roster' + dailyMonthNum;
-            updates[`${rosterNode}/${normId}/${item.dayNum}`] = item.shift; 
-        } else { 
-            let rosterNode = 'roster' + monthNum;
-            for (let dayKey in item.shiftsMap) { updates[`${rosterNode}/${normId}/${dayKey}`] = item.shiftsMap[dayKey]; } 
-        }
-    });
+
+    if (scope === 'daily') {
+        let dailyDateVal = document.getElementById('adminDailyDateInput').value;
+        let dailyMonthNum = parseInt(dailyDateVal.split('-')[1], 10);
+        let targetDayNum = parseInt(dailyDateVal.split('-')[2], 10);
+        let rosterNode = 'roster' + dailyMonthNum;
+        let currentMonthData = rosterDataMap[dailyMonthNum] || {};
+
+        let dailyAssignedShifts = {};
+        let driversInBatch = new Set(); 
+
+        extractedBatchRoster.forEach(item => {
+            let s = item.shift;
+            let baseShift = s.replace(/-OT$/i, '').replace(/-TRG$/i, ''); 
+            let norm = smartNormalize(baseShift);
+            if (/^[MEN][-]?\d{1,3}$/.test(baseShift) || /^[MEN][-]?(RES|RS)\d{1,2}$/.test(baseShift)) {
+                dailyAssignedShifts[norm] = item.rdmcId;
+            }
+            driversInBatch.add(item.rdmcId); 
+        });
+
+        Object.keys(currentMonthData).forEach(driverId => {
+            let existingShift = currentMonthData[driverId][targetDayNum];
+            if (existingShift && existingShift !== 'R' && existingShift !== 'ABSENT' && !existingShift.includes('LEAVE')) {
+                let baseExisting = existingShift.replace(/-OT$/i, '').replace(/-TRG$/i, '');
+                let normExisting = smartNormalize(baseExisting);
+                
+                if (dailyAssignedShifts[normExisting] && dailyAssignedShifts[normExisting] !== driverId) {
+                    if (!driversInBatch.has(driverId)) {
+                        updates[`${rosterNode}/${driverId}/${targetDayNum}`] = 'R'; 
+                    }
+                }
+            }
+        });
+        
+        extractedBatchRoster.forEach(item => {
+            updates[`${rosterNode}/${item.rdmcId}/${item.dayNum}`] = item.shift;
+        });
+
+    } else {
+        let rosterNode = 'roster' + monthNum;
+        extractedBatchRoster.forEach(item => {
+            for (let dayKey in item.shiftsMap) { 
+                updates[`${rosterNode}/${item.rdmcId}/${dayKey}`] = item.shiftsMap[dayKey]; 
+            } 
+        });
+    }
 
     db.ref().update(updates).then(() => { 
         let updateMsg = (scope === 'daily') ? t("اليومية المحددة", "Selected Daily") : t(`روستر شهر ${monthNum}`, `Roster Month ${monthNum}`);
@@ -3180,6 +3215,7 @@ function saveAllRosterToFirebase() {
         document.getElementById('rawTextInput').value = ''; document.getElementById('parsedRosterTable').innerHTML = ''; document.getElementById('driverCount').textContent = '0'; extractedBatchRoster = []; document.getElementById('parseResultBox').classList.add('hidden-section');
     }).catch((err) => { showToast(t("⚠️ حدث خطأ أثناء الحفظ: ", "⚠️ Save Error: ") + err.message, "error"); });
 }
+
 
 function sendGlobalBroadcast() {
     const text = document.getElementById('adminBroadcastInput').value.trim();
