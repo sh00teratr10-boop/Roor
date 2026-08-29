@@ -3421,20 +3421,22 @@ function getTripsCountForShift(shift) {
 }
 
 // ==========================================
-// 3. الدالة الرئيسية اللي بتفتح الشاشة وتجمع الإحصائيات
+// 3. الدالة الرئيسية اللي بتفتح الشاشة وتجمع الإحصائيات (النسخة السحابية الدقيقة)
 // ==========================================
 async function openDriverStatsModal() {
-        if (!currentDriver) { 
+    if (!currentDriver) { 
         alert("لا يوجد مستخدم مسجل الدخول!"); 
         return; 
     }
 
-    let myRdmcId = currentDriver.radioId;
+    // تجهيز رقم التشغيل بالظبط زي ما الفايربيز متبرمجة تقراه (بدون فواصل)
+    let normId = smartNormalize(currentDriver.serviceId).replace(/-/g, '');
     let myName = currentDriver.name;
+    let myRawId = currentDriver.rawServiceId; // ده لعرضه على الشاشة بس
 
     // إظهار الشاشة وعرض رسالة التحميل
     document.getElementById('driverStatsModal').classList.remove('hidden');
-    document.getElementById('statsDriverName').textContent = myName + " (" + myRdmcId + ")";
+    document.getElementById('statsDriverName').textContent = myName + " (" + myRawId + ")";
     document.getElementById('driverStatsContent').innerHTML = '<div class="col-span-full text-center py-8"><span class="text-blue-500 font-bold text-lg animate-pulse">جاري جلب البيانات من السحابة وحساب الإحصائيات... ⏳</span></div>';
 
     let currentMonth = new Date().getMonth() + 1; 
@@ -3448,10 +3450,10 @@ async function openDriverStatsModal() {
     const allLeaves = ['CL', 'SL', 'AL', 'COML', 'PATL', 'AL-SV'];
 
     try {
-        // سحب بيانات الـ 12 شهر للسواق ده من الفايربيز مرة واحدة
+        // سحب بيانات الـ 12 شهر للسواق ده مخصوص من الفايربيز مباشرة
         let promises = [];
         for (let m = 1; m <= 12; m++) {
-            promises.push(db.ref(`roster${m}/${myRdmcId}`).once('value'));
+            promises.push(db.ref(`roster${m}/${normId}`).once('value'));
         }
         
         let snapshots = await Promise.all(promises);
@@ -3463,7 +3465,8 @@ async function openDriverStatsModal() {
             let isCurrentMonth = (m === currentMonth);
 
             if (monthData) {
-                for (let day in monthData) {
+                // لفة على أيام الشهر
+                for (let day = 1; day <= 31; day++) {
                     let shift = monthData[day];
                     if (!shift) continue;
                     let upperShift = shift.toString().toUpperCase().trim();
@@ -3485,7 +3488,7 @@ async function openDriverStatsModal() {
                         stats.year.absent++;
                         if (isCurrentMonth) stats.month.absent++;
                     }
-                    // 3. حساب التدويرات (RES) وتجاهل الـ REST تماماً 
+                    // 3. حساب التدويرات (RES) وتجاهل الـ REST
                     else if (/^[MEN][-_]?(RES|RS)\d{1,2}/i.test(upperShift)) {
                         stats.year.res++;
                         if (isCurrentMonth) stats.month.res++;
@@ -3502,42 +3505,42 @@ async function openDriverStatsModal() {
             }
         });
 
-        // رسم الإحصائيات في الكروت
+        // رسم البطايق والأرقام بعد الحساب
         let html = `
-            <div class="bg-blue-50 dark:bg-gray-700 p-4 rounded-lg shadow border-r-4 border-blue-500 text-right">
+            <div class="bg-blue-50 dark:bg-gray-700 p-4 rounded-lg shadow border-r-4 border-blue-500 text-right hover:scale-105 transition-transform">
                 <h4 class="font-bold text-gray-700 dark:text-gray-200 mb-2">إجمالي الرحلات 🚂</h4>
-                <p class="text-sm">الشهر الحالي: <span class="font-black text-blue-600 text-lg">${stats.month.trips}</span> رحلة</p>
-                <p class="text-sm">طوال العام: <span class="font-black text-blue-600 text-lg">${stats.year.trips}</span> رحلة</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">الشهر الحالي: <span class="font-black text-blue-600 dark:text-blue-400 text-lg mx-1">${stats.month.trips}</span> رحلة</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">طوال العام: <span class="font-black text-blue-600 dark:text-blue-400 text-lg mx-1">${stats.year.trips}</span> رحلة</p>
             </div>
 
-            <div class="bg-indigo-50 dark:bg-gray-700 p-4 rounded-lg shadow border-r-4 border-indigo-500 text-right">
+            <div class="bg-indigo-50 dark:bg-gray-700 p-4 rounded-lg shadow border-r-4 border-indigo-500 text-right hover:scale-105 transition-transform">
                 <h4 class="font-bold text-gray-700 dark:text-gray-200 mb-2">أيام التدويرات (RES) 🔄</h4>
-                <p class="text-sm">الشهر الحالي: <span class="font-black text-indigo-600 text-lg">${stats.month.res}</span> يوم</p>
-                <p class="text-sm">طوال العام: <span class="font-black text-indigo-600 text-lg">${stats.year.res}</span> يوم</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">الشهر الحالي: <span class="font-black text-indigo-600 dark:text-indigo-400 text-lg mx-1">${stats.month.res}</span> يوم</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">طوال العام: <span class="font-black text-indigo-600 dark:text-indigo-400 text-lg mx-1">${stats.year.res}</span> يوم</p>
             </div>
 
-            <div class="bg-green-50 dark:bg-gray-700 p-4 rounded-lg shadow border-r-4 border-green-500 text-right">
+            <div class="bg-green-50 dark:bg-gray-700 p-4 rounded-lg shadow border-r-4 border-green-500 text-right hover:scale-105 transition-transform">
                 <h4 class="font-bold text-gray-700 dark:text-gray-200 mb-2">إجمالي الإجازات (شاملة) 🏖️</h4>
-                <p class="text-sm">الشهر الحالي: <span class="font-black text-green-600 text-lg">${stats.month.leaves}</span> يوم</p>
-                <p class="text-sm">طوال العام: <span class="font-black text-green-600 text-lg">${stats.year.leaves}</span> يوم</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">الشهر الحالي: <span class="font-black text-green-600 dark:text-green-400 text-lg mx-1">${stats.month.leaves}</span> يوم</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">طوال العام: <span class="font-black text-green-600 dark:text-green-400 text-lg mx-1">${stats.year.leaves}</span> يوم</p>
             </div>
 
-            <div class="bg-yellow-50 dark:bg-gray-700 p-4 rounded-lg shadow border-r-4 border-yellow-500 text-right">
+            <div class="bg-yellow-50 dark:bg-gray-700 p-4 rounded-lg shadow border-r-4 border-yellow-500 text-right hover:scale-105 transition-transform">
                 <h4 class="font-bold text-gray-700 dark:text-gray-200 mb-2">إجازات العرض (CL) ⚠️</h4>
-                <p class="text-sm">الشهر الحالي: <span class="font-black text-yellow-600 text-lg">${stats.month.cl}</span> يوم</p>
-                <p class="text-sm">طوال العام: <span class="font-black text-yellow-600 text-lg">${stats.year.cl}</span> يوم</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">الشهر الحالي: <span class="font-black text-yellow-600 dark:text-yellow-400 text-lg mx-1">${stats.month.cl}</span> يوم</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">طوال العام: <span class="font-black text-yellow-600 dark:text-yellow-400 text-lg mx-1">${stats.year.cl}</span> يوم</p>
             </div>
 
-            <div class="bg-orange-50 dark:bg-gray-700 p-4 rounded-lg shadow border-r-4 border-orange-500 text-right">
+            <div class="bg-orange-50 dark:bg-gray-700 p-4 rounded-lg shadow border-r-4 border-orange-500 text-right hover:scale-105 transition-transform">
                 <h4 class="font-bold text-gray-700 dark:text-gray-200 mb-2">الإجازات المرضية (SL) 🏥</h4>
-                <p class="text-sm">الشهر الحالي: <span class="font-black text-orange-600 text-lg">${stats.month.sl}</span> يوم</p>
-                <p class="text-sm">طوال العام: <span class="font-black text-orange-600 text-lg">${stats.year.sl}</span> يوم</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">الشهر الحالي: <span class="font-black text-orange-600 dark:text-orange-400 text-lg mx-1">${stats.month.sl}</span> يوم</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">طوال العام: <span class="font-black text-orange-600 dark:text-orange-400 text-lg mx-1">${stats.year.sl}</span> يوم</p>
             </div>
 
-            <div class="bg-red-50 dark:bg-gray-700 p-4 rounded-lg shadow border-r-4 border-red-500 text-right">
+            <div class="bg-red-50 dark:bg-gray-700 p-4 rounded-lg shadow border-r-4 border-red-500 text-right hover:scale-105 transition-transform">
                 <h4 class="font-bold text-gray-700 dark:text-gray-200 mb-2">أيام الغياب ❌</h4>
-                <p class="text-sm">الشهر الحالي: <span class="font-black text-red-600 text-lg">${stats.month.absent}</span> يوم</p>
-                <p class="text-sm">طوال العام: <span class="font-black text-red-600 text-lg">${stats.year.absent}</span> يوم</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">الشهر الحالي: <span class="font-black text-red-600 dark:text-red-400 text-lg mx-1">${stats.month.absent}</span> يوم</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">طوال العام: <span class="font-black text-red-600 dark:text-red-400 text-lg mx-1">${stats.year.absent}</span> يوم</p>
             </div>
         `;
 
