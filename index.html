@@ -144,7 +144,7 @@ body { font-family: 'Cairo', sans-serif; }
             <button onclick="openPdfModal('faults')" class="w-full text-start px-4 py-3.5 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 text-xs font-bold transition-colors" data-ar="🛠️ أعطال وحدات متحركة" data-en="🛠️ Train Faults">🛠️ أعطال وحدات متحركة</button>
             <button onclick="openPdfModal('sop')" class="w-full text-start px-4 py-3.5 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 text-xs font-bold transition-colors" data-ar="📖 إجراءات التشغيل (SOP)" data-en="📖 Operations (SOP)">📖 إجراءات التشغيل (SOP)</button>
             <button onclick="openInstructionsMenuModal()" class="w-full text-start px-4 py-3.5 hover:bg-purple-50/50 dark:hover:bg-gray-700/50 font-black text-purple-600 text-xs transition-colors" data-ar="📚 التعليمات وسجل الإشعارات" data-en="📚 Instructions & History">📚 التعليمات وسجل الإشعارات</button>
-            <button onclick="openDriverStatsModal()" class="w-full flex items-center justify-between px-4 py-3 text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg mb-2 transition-colors">    <span>📊 إحصائياتي (ملف القائد)</span></button>
+            <button onclick="openDriverStatsModal()" class="w-full text-start px-4 py-3.5 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 font-black text-blue-600 dark:text-blue-400 text-xs transition-colors" data-ar="📊 إحصائياتي (ملف القائد)" data-en="📊 My Stats (Driver Profile)">📊 إحصائياتي (ملف القائد)</button>
             <button onclick="toggleTheme()" id="themeToggleBtn" class="w-full text-start px-4 py-3.5 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 text-xs font-bold transition-colors" data-ar="الوضع النهاري ☀️" data-en="Light Mode ☀️">الوضع النهاري ☀️</button>
             <button onclick="openTechSupportModal()" class="w-full text-start px-4 py-3.5 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 font-black text-amber-600 text-xs transition-colors" data-ar="🛠️ الدعم الفني" data-en="🛠️ Tech Support">🛠️ الدعم الفني</button>
             <button onclick="logout()" class="w-full text-start px-4 py-3.5 hover:bg-red-50/80 dark:hover:bg-red-900/20 text-red-600 font-black text-xs transition-colors" data-ar="تسجيل الخروج 🚪" data-en="Logout 🚪">تسجيل الخروج 🚪</button>
@@ -3424,15 +3424,13 @@ function getTripsCountForShift(shift) {
 // 3. الدالة الرئيسية اللي بتفتح الشاشة وتجمع الإحصائيات
 // ==========================================
 async function openDriverStatsModal() {
-    // 👇 السطرين دول هما اللي اتعدلوا عشان يلقطوا رقم السواق أوتوماتيك بأي اسم
-    let myRdmcId = window.loggedInUserId || localStorage.getItem('rdmcId') || localStorage.getItem('userId') || localStorage.getItem('id') || localStorage.getItem('driverId') || localStorage.getItem('user_id') || localStorage.getItem('driver_id'); 
-    
-    let myName = window.loggedInUserName || localStorage.getItem('driverName') || localStorage.getItem('name') || localStorage.getItem('userName') || localStorage.getItem('user_name') || "قائد قطار";
-
-    if (!myRdmcId) { 
+        if (!currentDriver) { 
         alert("لا يوجد مستخدم مسجل الدخول!"); 
         return; 
     }
+
+    let myRdmcId = currentDriver.radioId;
+    let myName = currentDriver.name;
 
     // إظهار الشاشة وعرض رسالة التحميل
     document.getElementById('driverStatsModal').classList.remove('hidden');
