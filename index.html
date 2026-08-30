@@ -1242,44 +1242,66 @@ async function loadAllTransitionSheets() {
             if (text.trim().toLowerCase().startsWith('<!doctype html>')) continue;
             let lines = parseCSVText(text);
             let matrixForPair = {};
-            let currentShift = null, currentSequence = [], storageLoc = "", sweepCode = "", handover = "", notes = "";
+            
+            let currentShift = null, currentSequence = [], storageLoc = "", sweepCode = "", notes = "";
+            let colleagueCode = null; // اعتمدنا على كود الزميل فقط وتم إلغاء الـ RES
+
             for (let i = 1; i < lines.length; i++) {
                 let cols = parseCSVRow(lines[i]);
                 if (cols.length === 0 || cols.join('').trim() === '') continue;
+                
                 let c0 = cleanTxt(cols[0]).toUpperCase();
                 let normC0 = smartNormalize(c0);
+                
                 if (normC0.startsWith('N') && normC0.length <= 6) {
-                    if (currentShift) { matrixForPair[currentShift] = { trips: currentSequence, storageLoc, sweep: Boolean(sweepCode), sweepCode: sweepCode || null, notes: notes || null, handover: handover || null }; }
-                    currentShift = normC0; currentSequence = []; storageLoc = ""; sweepCode = ""; handover = ""; notes = "";
+                    if (currentShift) { 
+                        matrixForPair[currentShift] = { trips: currentSequence, storageLoc, sweep: Boolean(sweepCode), sweepCode: sweepCode || null, notes: notes || null, handover: colleagueCode || null }; 
+                    }
+                    currentShift = normC0; currentSequence = []; storageLoc = ""; sweepCode = ""; notes = "";
+                    colleagueCode = null;
                 }
+                
                 cols.forEach(val => {
                     let cleanV = cleanTxt(val).replace(/\.0$/, '');
                     if (cleanV === '') return;
-                    let isHandover = false;
                     
-                    // 🔥 تصليح قراءة الـ 3 أرقام (M-10) + قفل الحماية ضد الملاحظات 🔥
-                    let m = cleanV.match(/([MEN][-_]?\d{1,3})/i); 
-                    if (m && smartNormalize(m[1]) !== currentShift) { 
-                        if (!handover) { handover = m[1]; } 
-                        isHandover = true; 
-                    } else if (cleanV.toUpperCase().includes('RES')) { 
-                        if (!handover) { handover = cleanV; }
-                        isHandover = true; 
+                    let isHandoverToken = false;
+
+                    let tripMatch = cleanV.match(/\((\d{3,4})\)/);
+                    if (tripMatch && !currentSequence.includes(tripMatch[1])) {
+                        currentSequence.push(tripMatch[1]);
                     }
 
-                    if (!isHandover) {
-                        if (/^\d{3,4}$/.test(cleanV)) { if (!currentSequence.includes(cleanV)) currentSequence.push(cleanV); } 
-                        else if (cleanV.includes("SWP")) sweepCode = cleanV; 
-                        else if (cleanV.includes("ورشة") || cleanV.includes("سكة")) storageLoc = cleanV; 
+                    let normalTripMatch = cleanV.match(/^(\d{3,4})$/);
+                    if (normalTripMatch && !currentSequence.includes(normalTripMatch[1])) {
+                        currentSequence.push(normalTripMatch[1]);
+                    }
+
+                    let cleanV_Eng = cleanV.replace(/م/g, 'M').replace(/ا/g, 'E').replace(/ن/g, 'N');
+                    let m = cleanV_Eng.match(/([MEN][-_ ]?\d{1,3})/i);
+                    
+                    // اصطياد رمز التسليم الحقيقي فقط (زي M-30) وتجاهل الـ RES نهائياً
+                    if (m && smartNormalize(m[1]) !== currentShift && !cleanV.toUpperCase().includes('RES')) {
+                        colleagueCode = m[1].replace(/\s/g, ''); 
+                        isHandoverToken = true;
+                    }
+
+                    if (!isHandoverToken) {
+                        if (cleanV.includes("SWP")) sweepCode = cleanV;
+                        else if (cleanV.includes("ورشة") || cleanV.includes("سكة")) storageLoc = cleanV;
                         else if (cleanV.includes("إخراج") || cleanV.includes("تدويرات")) notes = cleanV;
                     }
                 });
             }
-            if (currentShift) { matrixForPair[currentShift] = { trips: currentSequence, storageLoc, sweep: Boolean(sweepCode), sweepCode: sweepCode || null, handover: handover || null }; }
+            
+            if (currentShift) { 
+                matrixForPair[currentShift] = { trips: currentSequence, storageLoc, sweep: Boolean(sweepCode), sweepCode: sweepCode || null, notes: notes || null, handover: colleagueCode || null }; 
+            }
             transitionMatrix[key] = matrixForPair;
         } catch(e) {}
     }
 }
+
 
 async function fetchAndParseFullSchedule(url, tripsMapTarget, isAlex = false) {
     try {
@@ -2099,10 +2121,37 @@ function getNightShiftData(todayScheduleStr, tomorrowScheduleStr, shiftCode) {
     return null;
 }
 
-// 🛑 التعديل السحري: البحث التلقائي للوردية لو مش في الجدول المتسجل 🛑
 function generateDayTripsHTML(dayNum, shiftCodeRaw, normShift, scheduleRaw, driverRoster, dateValOverride = null) {
     if (isRestDay(shiftCodeRaw)) {
         return `<div class="text-center py-8 font-black bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-900/20 dark:to-rose-900/20 rounded-2xl border border-red-200 dark:border-red-800 shadow-sm"><p class="text-red-500 text-lg">🏖️ ${t('إجازة', 'Day Off')} / ${shiftCodeRaw}</p></div>`;
+    }
+
+    const selectedDateVal = dateValOverride || document.getElementById('dailyDatePicker').value || getTodayYYYYMMDD();
+    
+    let dObjYest = new Date(selectedDateVal); dObjYest.setDate(dObjYest.getDate() - 1);
+    let yDateVal = `${dObjYest.getFullYear()}-${String(dObjYest.getMonth() + 1).padStart(2, '0')}-${String(dObjYest.getDate()).padStart(2, '0')}`;
+    let yDayNum = dObjYest.getDate();
+    let yesterdayScheduleRaw = getSmartScheduleName(yDateVal, yDayNum);
+
+    let tomorrowD = new Date(selectedDateVal); tomorrowD.setDate(tomorrowD.getDate() + 1);
+    let tomDateVal = `${tomorrowD.getFullYear()}-${String(tomorrowD.getMonth() + 1).padStart(2, '0')}-${String(tomorrowD.getDate()).padStart(2, '0')}`;
+    let tomDayNum = tomorrowD.getDate();
+    let tomorrowScheduleRaw = getSmartScheduleName(tomDateVal, tomDayNum);
+
+    let cleanToday = scheduleRaw.split('[')[0].replace(/-$/, '').trim();
+    let cleanYesterday = yesterdayScheduleRaw.split('[')[0].replace(/-$/, '').trim();
+    let cleanTomorrow = tomorrowScheduleRaw.split('[')[0].replace(/-$/, '').trim();
+
+    // 🔥 التعديل التاني: بنشغل كود التحويلة الأول قبل الـ Fallback 🔥
+    let isTransition = false; let transitionNotes = ""; let tomorrowTripsMap = {}; let tomorrowIncomingMap = {};
+    let nightTransitionData = null;
+
+    if (normShift.startsWith('N')) {
+        nightTransitionData = getNightShiftData(scheduleRaw, tomorrowScheduleRaw, normShift);
+        if (cleanToday !== cleanTomorrow && nightTransitionData) {
+            isTransition = true;
+            transitionNotes = nightTransitionData.notes || "";
+        }
     }
 
     let upperSch = (scheduleRaw || "").toUpperCase();
@@ -2123,8 +2172,21 @@ function generateDayTripsHTML(dayNum, shiftCodeRaw, normShift, scheduleRaw, driv
     else if (isAlex403) { myShiftData = alex403DataMap[normShift]; scheduleTypeName = t("الإسكندرية 403", "Alex 403"); activeTripsMap = alex403TripsMap; activeIncomingMap = alex403IncomingMap; activeDataMap = alex403DataMap; }
     else if (isAlex) { myShiftData = alexDataMap[normShift]; scheduleTypeName = t("الإسكندرية", "Alexandria"); activeTripsMap = alexTripsMap; activeIncomingMap = alexIncomingMap; activeDataMap = alexDataMap; }
 
-    // البحث في باقي الجداول لو الوردية مش موجودة في الجدول الأساسي المتسجل
-    if (!myShiftData || !myShiftData.tripNumbers || myShiftData.tripNumbers.length === 0) {
+    // 🔥 لو الوردية موجودة في التحويلة، نديها داتا التحويلة ونمنع الفول باك يشتغل 🔥
+    if (isTransition) {
+        myShiftData = { tripNumbers: nightTransitionData.trips, handoverCode: nightTransitionData.handover ? smartNormalize(nightTransitionData.handover) : null };
+        
+        let tomorrowUpper = tomorrowScheduleRaw.toUpperCase();
+        if (tomorrowUpper.includes("CAIRO") || tomorrowUpper.includes("450")) { tomorrowTripsMap = cairoTripsMap; tomorrowIncomingMap = cairoIncomingMap; }
+        else if (tomorrowUpper.includes("ARISH") || tomorrowUpper.includes("407")) { tomorrowTripsMap = arishTripsMap; tomorrowIncomingMap = arishIncomingMap; }
+        else if (tomorrowUpper.includes("ASYUT") || tomorrowUpper.includes("369")) { tomorrowTripsMap = asyutTripsMap; tomorrowIncomingMap = asyutIncomingMap; }
+        else if (tomorrowUpper.includes("LUXOR") || tomorrowUpper.includes("WE") || tomorrowUpper.includes("341")) { tomorrowTripsMap = luxorTripsMap; tomorrowIncomingMap = luxorIncomingMap; } 
+        else if (tomorrowUpper.includes("SIWA") || tomorrowUpper.includes("WD") || tomorrowUpper.includes("447")) { tomorrowTripsMap = siwaTripsMap; tomorrowIncomingMap = siwaIncomingMap; } 
+        else if (tomorrowUpper.includes("403")) { tomorrowTripsMap = alex403TripsMap; tomorrowIncomingMap = alex403IncomingMap; }
+        else if (tomorrowUpper.includes("ALEX") || tomorrowUpper.includes("416")) { tomorrowTripsMap = alexTripsMap; tomorrowIncomingMap = alexIncomingMap; }
+    } 
+    // الفول باك ملوش دعوة بالتحويلات خلاص
+    else if (!myShiftData || !myShiftData.tripNumbers || myShiftData.tripNumbers.length === 0) {
         if (cairoDataMap[normShift]) { myShiftData = cairoDataMap[normShift]; activeTripsMap = cairoTripsMap; activeIncomingMap = cairoIncomingMap; activeDataMap = cairoDataMap; scheduleRaw = "WD-450-[CAIRO]"; }
         else if (arishDataMap[normShift]) { myShiftData = arishDataMap[normShift]; activeTripsMap = arishTripsMap; activeIncomingMap = arishIncomingMap; activeDataMap = arishDataMap; scheduleRaw = "ST-407-[ARISH]"; }
         else if (asyutDataMap[normShift]) { myShiftData = asyutDataMap[normShift]; activeTripsMap = asyutTripsMap; activeIncomingMap = asyutIncomingMap; activeDataMap = asyutDataMap; scheduleRaw = "FR-369-[ASYUT]"; }
@@ -2134,45 +2196,8 @@ function generateDayTripsHTML(dayNum, shiftCodeRaw, normShift, scheduleRaw, driv
         else if (alexDataMap[normShift]) { myShiftData = alexDataMap[normShift]; activeTripsMap = alexTripsMap; activeIncomingMap = alexIncomingMap; activeDataMap = alexDataMap; scheduleRaw = "ST-416-[ALEX_WFH]"; }
     }
 
-    let isTransition = false; let transitionNotes = ""; let tomorrowTripsMap = {}; let tomorrowIncomingMap = {};
-    const selectedDateVal = dateValOverride || document.getElementById('dailyDatePicker').value || getTodayYYYYMMDD();
-    
-    let dObjYest = new Date(selectedDateVal); dObjYest.setDate(dObjYest.getDate() - 1);
-    let yDateVal = `${dObjYest.getFullYear()}-${String(dObjYest.getMonth() + 1).padStart(2, '0')}-${String(dObjYest.getDate()).padStart(2, '0')}`;
-    let yDayNum = dObjYest.getDate();
-    let yesterdayScheduleRaw = getSmartScheduleName(yDateVal, yDayNum);
-
-    let tomorrowD = new Date(selectedDateVal); tomorrowD.setDate(tomorrowD.getDate() + 1);
-    let tomDateVal = `${tomorrowD.getFullYear()}-${String(tomorrowD.getMonth() + 1).padStart(2, '0')}-${String(tomorrowD.getDate()).padStart(2, '0')}`;
-    let tomDayNum = tomorrowD.getDate();
-    let tomorrowScheduleRaw = getSmartScheduleName(tomDateVal, tomDayNum);
-
-    let cleanToday = scheduleRaw.split('[')[0].replace(/-$/, '').trim();
-    let cleanYesterday = yesterdayScheduleRaw.split('[')[0].replace(/-$/, '').trim();
-    let cleanTomorrow = tomorrowScheduleRaw.split('[')[0].replace(/-$/, '').trim();
-
-    if (normShift.startsWith('N')) {
-        let nightTransitionData = getNightShiftData(scheduleRaw, tomorrowScheduleRaw, normShift);
-        if (cleanToday !== cleanTomorrow && nightTransitionData) {
-            isTransition = true;
-            myShiftData = { tripNumbers: nightTransitionData.trips, handoverCode: nightTransitionData.handover ? smartNormalize(nightTransitionData.handover) : null };
-            transitionNotes = nightTransitionData.notes || "";
-            let tomorrowUpper = tomorrowScheduleRaw.toUpperCase();
-            
-            if (tomorrowUpper.includes("CAIRO") || tomorrowUpper.includes("450")) { tomorrowTripsMap = cairoTripsMap; tomorrowIncomingMap = cairoIncomingMap; }
-            else if (tomorrowUpper.includes("ARISH") || tomorrowUpper.includes("407")) { tomorrowTripsMap = arishTripsMap; tomorrowIncomingMap = arishIncomingMap; }
-            else if (tomorrowUpper.includes("ASYUT") || tomorrowUpper.includes("369")) { tomorrowTripsMap = asyutTripsMap; tomorrowIncomingMap = asyutIncomingMap; }
-            else if (tomorrowUpper.includes("LUXOR") || tomorrowUpper.includes("WE")) { tomorrowTripsMap = luxorTripsMap; tomorrowIncomingMap = luxorIncomingMap; } 
-            else if (tomorrowUpper.includes("SIWA") || tomorrowUpper.includes("WD")) { tomorrowTripsMap = siwaTripsMap; tomorrowIncomingMap = siwaIncomingMap; } 
-            else if (tomorrowUpper.includes("403")) { tomorrowTripsMap = alex403TripsMap; tomorrowIncomingMap = alex403IncomingMap; }
-            else if (tomorrowUpper.includes("ALEX") || tomorrowUpper.includes("ST-416")) { tomorrowTripsMap = alexTripsMap; tomorrowIncomingMap = alexIncomingMap; }
-        }
-    }
-
     if (myShiftData && myShiftData.tripNumbers && myShiftData.tripNumbers.length > 0) {
-        
         let receiveFromCode = null; let receiveFromDriverName = null;
-        
         if (cleanYesterday !== cleanToday && normShift.startsWith('M')) {
             let transKey = `${cleanYesterday}_${cleanToday}`;
             if (transitionMatrix[transKey]) {
@@ -2387,6 +2412,7 @@ function generateDayTripsHTML(dayNum, shiftCodeRaw, normShift, scheduleRaw, driv
         return `<div class="text-center py-10 font-black bg-slate-100 dark:bg-gray-800 rounded-3xl border dark:border-gray-700 shadow-sm p-6"><p class="text-purple-600 dark:text-purple-400 text-lg mb-1">📋 ${t('البيان المسجل بالروستر:', 'Roster Record:')} (${shiftCodeRaw})</p><p class="text-gray-500 text-xs font-bold mt-2">${t('تطبيق / عمل مضاف بالروستر وليس له مسار رحلات معرّف حالياً.', 'Applied task without defined trips.')}</p></div>`;
     }
 }
+
 
 function buildDashboardData(driver, showLoading = true) {
     renderDailyDetails(); renderFullMonth(driver);
@@ -2700,6 +2726,20 @@ function searchByTripCode() {
     let targetShiftCode = normQuery;
     let shiftData = activeDataMap[targetShiftCode];
 
+    // 1. تحديد السواق عشان نعرف هو شغال إيه بكرة!
+    let assignedDriver = null;
+    let nextShiftForDriver = null;
+    for (let i = 0; i < driversData.length; i++) {
+        let d = driversData[i];
+        let dRoster = getDriverRosterForDate(d.serviceId, dateVal);
+        if (dRoster && smartNormalize(dRoster[dayNum]) === targetShiftCode) { 
+            assignedDriver = d; 
+            let tomorrowD = new Date(dateVal); tomorrowD.setDate(tomorrowD.getDate() + 1);
+            nextShiftForDriver = smartNormalize(dRoster[tomorrowD.getDate()] || '');
+            break; 
+        }
+    }
+
     if (!shiftData && !/^\d{3,4}$/.test(normQuery)) {
         if (cairoDataMap[targetShiftCode]) { shiftData = cairoDataMap[targetShiftCode]; scheduleRaw = "WD-450-[CAIRO]"; }
         else if (arishDataMap[targetShiftCode]) { shiftData = arishDataMap[targetShiftCode]; scheduleRaw = "ST-407-[ARISH]"; }
@@ -2708,6 +2748,38 @@ function searchByTripCode() {
         else if (luxorDataMap[targetShiftCode]) { shiftData = luxorDataMap[targetShiftCode]; scheduleRaw = "WE-341-[LUXOR]"; }
         else if (alex403DataMap[targetShiftCode]) { shiftData = alex403DataMap[targetShiftCode]; scheduleRaw = "ST-403-[ALEX]"; }
         else if (alexDataMap[targetShiftCode]) { shiftData = alexDataMap[targetShiftCode]; scheduleRaw = "ST-416-[ALEX_WFH]"; }
+        
+        if (!shiftData) {
+            for (let key in transitionMatrix) {
+                let trans = transitionMatrix[key][targetShiftCode];
+                if (trans) {
+                    if (nextShiftForDriver && trans.handover && smartNormalize(trans.handover) === nextShiftForDriver) {
+                        shiftData = trans;
+                        let baseSch = key.split('_')[0]; 
+                        if (baseSch.includes('450')) scheduleRaw = "WD-450-[CAIRO]";
+                        else if (baseSch.includes('407')) scheduleRaw = "ST-407-[ARISH]";
+                        else if (baseSch.includes('369')) scheduleRaw = "FR-369-[ASYUT]";
+                        else if (baseSch.includes('341')) scheduleRaw = "WE-341-[LUXOR]";
+                        else if (baseSch.includes('403')) scheduleRaw = "ST-403-[ALEX]";
+                        else if (baseSch.includes('416')) scheduleRaw = "ST-416-[ALEX_WFH]";
+                        else if (baseSch.includes('447')) scheduleRaw = "WD-447-[SIWA]";
+                        break;
+                    } 
+                    else if (!nextShiftForDriver) {
+                        shiftData = trans;
+                        let baseSch = key.split('_')[0]; 
+                        if (baseSch.includes('450')) scheduleRaw = "WD-450-[CAIRO]";
+                        else if (baseSch.includes('407')) scheduleRaw = "ST-407-[ARISH]";
+                        else if (baseSch.includes('369')) scheduleRaw = "FR-369-[ASYUT]";
+                        else if (baseSch.includes('341')) scheduleRaw = "WE-341-[LUXOR]";
+                        else if (baseSch.includes('403')) scheduleRaw = "ST-403-[ALEX]";
+                        else if (baseSch.includes('416')) scheduleRaw = "ST-416-[ALEX_WFH]";
+                        else if (baseSch.includes('447')) scheduleRaw = "WD-447-[SIWA]";
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     if (!shiftData && /^\d{3,4}$/.test(normQuery)) {
@@ -2740,13 +2812,14 @@ function searchByTripCode() {
                 if (shiftData) break;
             }
         }
-    }
-
-    let assignedDriver = null;
-    for (let i = 0; i < driversData.length; i++) {
-        let d = driversData[i];
-        let dRoster = getDriverRosterForDate(d.serviceId, dateVal);
-        if (dRoster && smartNormalize(dRoster[dayNum]) === targetShiftCode) { assignedDriver = d; break; }
+        if(shiftData && targetShiftCode !== normQuery) {
+            assignedDriver = null;
+            for (let i = 0; i < driversData.length; i++) {
+                let d = driversData[i];
+                let dRoster = getDriverRosterForDate(d.serviceId, dateVal);
+                if (dRoster && smartNormalize(dRoster[dayNum]) === targetShiftCode) { assignedDriver = d; break; }
+            }
+        }
     }
 
     let driverHTML = '';
@@ -2771,9 +2844,12 @@ function searchByTripCode() {
     }
 
     if (shiftData || assignedDriver) {
-        let fakeRoster = {};
-        fakeRoster[dayNum] = targetShiftCode;
-        let fullTripsHTML = generateDayTripsHTML(dayNum, targetShiftCode, targetShiftCode, scheduleRaw, fakeRoster, dateVal);
+        let rosterToPass = {};
+        if (assignedDriver) {
+            rosterToPass = getDriverRosterForDate(assignedDriver.serviceId, dateVal) || {};
+        }
+        rosterToPass[dayNum] = targetShiftCode;
+        let fullTripsHTML = generateDayTripsHTML(dayNum, targetShiftCode, targetShiftCode, scheduleRaw, rosterToPass, dateVal);
         
         let searchedTripBadge = '';
         if (/^\d{3,4}$/.test(normQuery) && targetShiftCode !== normQuery) {
@@ -2792,6 +2868,7 @@ function searchByTripCode() {
         resultBox.innerHTML = `<div class="bg-amber-50 dark:bg-amber-900/20 p-8 rounded-3xl border border-amber-200 dark:border-amber-800 text-center shadow-sm"><span class="text-4xl block mb-3 drop-shadow-md">⚠️</span><h4 class="font-black text-lg text-amber-800 dark:text-amber-400 mb-1">${t('الوردية أو الرحلة غير موجودة', 'Shift or Trip not found')}</h4></div>`;
     }
 }
+
 
 function updateLiveAdminMap() {
     if (document.getElementById('admin-page').classList.contains('hidden-section') || document.getElementById('adminMapSection').classList.contains('hidden-section')) return;
