@@ -27,9 +27,19 @@ body { font-family: 'Cairo', sans-serif; }
 .show-toast { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
 @keyframes bellRing { 0%, 100% { transform: rotate(0deg); } 20% { transform: rotate(15deg); } 40% { transform: rotate(-15deg); } 60% { transform: rotate(10deg); } 80% { transform: rotate(-10deg); } }
 .ringing { animation: bellRing 0.5s ease-in-out infinite; color: #ef4444; }
+
+/* ستايل شريط التصفح الخفي */
+.ghost-mode-banner { background-color: #fee2e2; color: #991b1b; padding: 8px 16px; text-align: center; font-weight: bold; border-bottom: 2px solid #ef4444; z-index: 99999; position: sticky; top: 0; }
+.dark .ghost-mode-banner { background-color: #7f1d1d; color: #fca5a5; border-bottom: 2px solid #b91c1c; }
 </style>
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 text-gray-900 dark:text-white min-h-screen transition-colors duration-300">
+
+<!-- شريط التصفح الخفي -->
+<div id="ghost-banner" class="ghost-mode-banner hidden-section flex justify-between items-center">
+    <span>🕵️‍♂️ وضع التصفح الخفي (دخول مركزي من أدمن الإدارة)</span>
+    <button onclick="exitGhostMode()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg text-sm transition-all shadow-sm font-black">إنهاء التصفح 🔙</button>
+</div>
 
 <!-- إشعار التنبيه -->
 <div id="toast-notification" class="hidden-toast fixed top-1/2 left-1/2 bg-white/95 dark:bg-gray-800/95 backdrop-blur-xl shadow-2xl rounded-[2rem] p-8 flex flex-col items-center justify-center gap-3 z-[999999] transition-all duration-300 border border-gray-100 dark:border-gray-700 min-w-[280px] text-center">
@@ -256,7 +266,6 @@ body { font-family: 'Cairo', sans-serif; }
                 <h3 class="text-lg font-black text-indigo-600 mb-2">👔 تحديث روستر النظار</h3>
                 <p class="text-xs text-gray-500 mb-4 font-bold">انسخ الروستر من الإكسيل/الـ PDF. الدالة الذكية هتمسح الرموز الوهمية وتسحب الشفتات بالمسطرة!</p>
                 
-                <!-- التعديل الجديد: تحديد نوع التحديث (يومية ولا شهر) -->
                 <div class="flex gap-4 mb-4 bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-xl border border-indigo-100 dark:border-indigo-800">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="updateScope_ZM" value="monthly" checked onchange="toggleScopeUI('ZM')" class="text-indigo-600 w-4 h-4 focus:ring-indigo-500">
@@ -333,7 +342,6 @@ body { font-family: 'Cairo', sans-serif; }
                 <h3 class="text-lg font-black text-blue-600 mb-2">🎟️ تحديث روستر الصرافين والسينيورات</h3>
                 <p class="text-xs text-gray-500 mb-4 font-bold">الصق الروستر من الإكسيل/الـ PDF. الدالة الذكية هتمسح الرموز الوهمية وتوزع الشفتات مظبوط.</p>
                 
-                <!-- التعديل الجديد: تحديد نوع التحديث (يومية ولا شهر) -->
                 <div class="flex gap-4 mb-4 bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-blue-800">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="updateScope_SP" value="monthly" checked onchange="toggleScopeUI('SP')" class="text-blue-600 w-4 h-4 focus:ring-blue-500">
@@ -456,6 +464,7 @@ const zonesConfig = {
 };
 
 let currentRole = ''; let currentUserId = ''; let currentUserData = {};
+let isGhostMode = false; // المتغير الجديد لتمييز وضع التخفي
 let extractedBatchRoster = []; let lastNotifCount = 0; let radarInterval = null; let tripsDataMap = {};
 
 // ==========================================
@@ -474,21 +483,33 @@ function closeModal(id) { document.getElementById(id).classList.add('hidden-sect
 function logout() { localStorage.removeItem('savedServiceId'); localStorage.removeItem('savedPassword'); location.reload(); }
 
 window.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        const splashBar = document.getElementById('splash-bar');
-        if (splashBar) { splashBar.style.width = '100%'; splashBar.style.transitionDuration = '2000ms'; }
+    
+    // التحقق السحري من الرابط (Ghost Mode)
+    const urlParams = new URLSearchParams(window.location.search);
+    const ghostId = urlParams.get('ghost');
+    const token = urlParams.get('token');
+
+    if (ghostId && token === 'SuperAdmin2026') {
+        // دخول مباشر بدون شاشة تحميل طويلة
+        executeURLGhostLogin(ghostId);
+    } else {
+        // الدخول العادي بشاشة التحميل
         setTimeout(() => {
-            const splash = document.getElementById('splash-screen');
-            if (splash) splash.style.opacity = '0';
+            const splashBar = document.getElementById('splash-bar');
+            if (splashBar) { splashBar.style.width = '100%'; splashBar.style.transitionDuration = '2000ms'; }
             setTimeout(() => {
-                if (splash) {
-                    splash.classList.add('hidden-section');
-                    document.getElementById('auth-page').classList.remove('hidden-section');
-                    checkLocalLogin(); 
-                }
-            }, 700);
-        }, 2000);
-    }, 100);
+                const splash = document.getElementById('splash-screen');
+                if (splash) splash.style.opacity = '0';
+                setTimeout(() => {
+                    if (splash) {
+                        splash.classList.add('hidden-section');
+                        document.getElementById('auth-page').classList.remove('hidden-section');
+                        checkLocalLogin(); 
+                    }
+                }, 700);
+            }, 2000);
+        }, 100);
+    }
 
     let destSelectSP = document.getElementById('transferDest_SP');
     let destSelectZM = document.getElementById('transferDest_ZM');
@@ -508,7 +529,6 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('dailyDatePicker').value = todayDateStr;
     document.getElementById('swapDailyDate').value = todayDateStr;
     
-    // جلب التواريخ لصفحات الإدارة التلقائية
     let currentMonthStr = todayDateStr.slice(0, 7); 
     document.getElementById('adminMasterMonth').value = currentMonthStr;
     document.getElementById('adminCashierMonth').value = currentMonthStr;
@@ -516,13 +536,69 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('adminCashierDate').value = todayDateStr;
 });
 
+// ==========================================
+// التصفح الخفي القادم من الرابط السري
+// ==========================================
+function executeURLGhostLogin(ghostIdRaw) {
+    let serviceId = ghostIdRaw.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    
+    document.getElementById('splash-screen').classList.add('hidden-section');
+    document.getElementById('auth-page').classList.add('hidden-section');
+
+    db.ref('employees/' + serviceId).once('value', empSnap => {
+        if(!empSnap.exists()) {
+            showToast("رقم التشغيل غير مسجل بالنظام!", "error");
+            document.getElementById('auth-page').classList.remove('hidden-section');
+            return;
+        }
+        
+        let empData = empSnap.val(); 
+        currentUserData = empData;
+        currentUserId = serviceId;
+        isGhostMode = true;
+        
+        if (empData.role === 'senior' || serviceId.startsWith('S')) currentRole = 'senior';
+        else if (empData.role === 'master' || serviceId.startsWith('M')) currentRole = 'master';
+        else currentRole = 'casher';
+
+        document.querySelectorAll('.senior-only').forEach(el => el.classList.add('hidden-section'));
+        document.querySelectorAll('.master-only').forEach(el => el.classList.add('hidden-section'));
+
+        if (currentRole === 'senior') document.querySelectorAll('.senior-only').forEach(el => el.classList.remove('hidden-section'));
+        if (currentRole === 'master') { 
+            document.querySelectorAll('.master-only').forEach(el => el.classList.remove('hidden-section')); 
+            renderLostItems(); 
+        }
+
+        let displayName = empData.name ? empData.name.split(' ')[0] + ' ' + (empData.name.split(' ')[1] || '') : serviceId;
+
+        document.getElementById('dashboard-page').classList.remove('hidden-section');
+        document.getElementById('ghost-banner').classList.remove('hidden-section'); // إظهار الشريط الأحمر فوق
+        document.getElementById('welcomeMessage').textContent = "مرحباً: " + displayName;
+        
+        listenForNotifications(); renderDashboard(); renderWeekly(); renderMonthly();
+        showToast("تم الدخول في وضع التصفح الخفي بنجاح", "success");
+    }).catch(err => {
+        showToast('خطأ في الاتصال بقاعدة البيانات!', 'error');
+        document.getElementById('auth-page').classList.remove('hidden-section');
+    });
+}
+
+function exitGhostMode() {
+    // بيمسح الرابط السري من المتصفح ويعمل ريفريش للصفحة عشان يرجع تسجيل دخول عادي
+    if(window.history.replaceState) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    location.reload();
+}
+
 function checkLocalLogin() {
     let savedId = localStorage.getItem('savedServiceId'); let savedPass = localStorage.getItem('savedPassword');
     if(savedId && savedPass) { document.getElementById('loginServiceId').value = savedId; document.getElementById('loginPassword').value = savedPass; document.getElementById('rememberMeCheck').checked = true; }
 }
 
 // ==========================================
-// 3. التسجيل والدخول
+// 3. التسجيل والدخول العادي
 // ==========================================
 function switchAuthTab(tab) {
     document.getElementById('loginSection').classList.toggle('hidden-section', tab !== 'login');
@@ -851,9 +927,6 @@ function openStatsModal() {
     });
 }
 
-// ==========================================
-// 8. الدبابة الكاسحة: استخراج الروستر للجميع 🚀
-// ==========================================
 function toggleScopeUI(role) {
     let scopeName = role === 'ZM' ? 'updateScope_ZM' : 'updateScope_SP';
     let scope = document.querySelector(`input[name="${scopeName}"]:checked`).value;
@@ -925,7 +998,6 @@ function extractRoster(roleType) {
         let shifts = {}; let dayCount = 1;
         let ignoreList = ['SEPTEMBER', 'AUGUST', 'OCTOBER', 'NOVEMBER', 'DECEMBER', 'SCHEDULE', 'LEGEND', 'Z1', 'SM', 'ROM', 'ROSTER', 'LIMITED', 'SHARING', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN', 'MON', 'SORT', 'SV', 'CODE', 'NAME', 'POSITION', 'GENDER', 'OPEN', 'SLOTS', 'D-RES', 'E-RES', 'N-RES'];
         
-        // التعديل السحري: لو التحديث يومية بناخد أول شفت بس ونقفل الدائرة!
         if (scope === 'daily') {
             for (let j = 0; j < shiftTokens.length; j++) {
                 let s = shiftTokens[j].toUpperCase();
@@ -933,10 +1005,9 @@ function extractRoster(roleType) {
                 if(!isNaN(s)) continue; 
                 if(s.includes('RDMC') || s.includes('ROMC') || s.includes('STATION')) continue; 
                 shifts['daily'] = s;
-                break; // المقص: وقف بعد أول شفت سليم
+                break;
             }
         } else {
-            // شهر كامل
             for (let j = 0; j < shiftTokens.length && dayCount <= 31; j++) {
                 let s = shiftTokens[j].toUpperCase();
                 if(ignoreList.includes(s)) continue; 
@@ -1015,9 +1086,6 @@ function uploadExtractedRoster(roleType) {
     }).catch(err => { showToast("حدث خطأ أثناء الرفع: " + err.message, "error"); });
 }
 
-// ==========================================
-// 9. النقل ومراقبة الزونات اللحظية
-// ==========================================
 function executePrivateTransfer(inputId, destId) {
     const empRaw = document.getElementById(inputId).value.trim().toUpperCase(); const dest = document.getElementById(destId).value;
     if(!empRaw || !dest) { showToast("أدخل بيانات الموظف والمحطة!", "error"); return; }
