@@ -585,12 +585,10 @@ function executeURLGhostLogin(ghostIdRaw) {
 }
 
 function exitGhostMode() {
-    // بيمسح الرابط السري من المتصفح ويعمل ريفريش للصفحة عشان يرجع تسجيل دخول عادي
-    if(window.history.replaceState) {
-        window.history.replaceState({}, document.title, window.location.pathname);
-    }
-    location.reload();
+    // الرجوع مباشرة لأبلكيشن السواقين في نفس الشاشة (الـ WebViewer)
+    window.location.href = "https://sh00teratr10-boop.github.io/Myroster/";
 }
+
 
 function checkLocalLogin() {
     let savedId = localStorage.getItem('savedServiceId'); let savedPass = localStorage.getItem('savedPassword');
